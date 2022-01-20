@@ -1,38 +1,29 @@
 package web.dao;
 
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import web.model.User;
 
 import javax.persistence.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.logging.Logger;
 
+import java.util.List;
 
 @Repository
+@Transactional
 public class UserDaoImpl implements UserDao {
 
-    private static final Logger logger = Logger.getLogger("UserDaoImpl.class");
-
-    private static int people_count;
-    private List<User> users;
-
-    {
-        users = new ArrayList<>(300);
-
-        users.add(new User(++people_count, "Karim", "Samatov", "Engineer"));
-        users.add(new User(++people_count, "Ruslan", "Samatov", "Bartander"));
-        users.add(new User(++people_count, "Zamira", "Samatova", "Student"));
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Override
+    @SuppressWarnings("unchecked")
     public List<User> allUsers() {
-        return users;
+        return entityManager.createQuery("select u from User u", User.class).getResultList();
     }
 
     @Override
     public void delete(int id) {
-        users.removeIf(u -> u.getId() == id);
+        entityManager.remove(getById(id));
     }
 
     @Override
@@ -41,16 +32,16 @@ public class UserDaoImpl implements UserDao {
         userToUpdated.setName(user.getName());
         userToUpdated.setSurname(user.getSurname());
         userToUpdated.setProfession(user.getProfession());
+        entityManager.merge(userToUpdated);
     }
 
     @Override
     public User getById(int id) {
-        return users.stream().filter(user -> user.getId() == id).findAny().orElse(null);
+        return entityManager.find(User.class,id);
     }
 
     @Override
     public void save(User user) {
-        user.setId(++people_count);
-        users.add(user);
+        entityManager.persist(user);
     }
 }

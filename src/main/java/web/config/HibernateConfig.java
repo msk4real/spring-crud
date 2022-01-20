@@ -1,45 +1,52 @@
 package web.config;
 
-import org.apache.tomcat.dbcp.dbcp2.BasicDataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.core.env.Environment;
+import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.orm.jpa.JpaTransactionManager;
-import org.springframework.orm.jpa.LocalEntityManagerFactoryBean;
+import org.springframework.orm.jpa.JpaVendorAdapter;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 import java.util.Properties;
 
 @Configuration
 @ComponentScan(basePackages = "web.config")
-@EnableTransactionManagement
+@EnableTransactionManagement(proxyTargetClass = true)
 @PropertySource(value = "classpath:db.properties")
 public class HibernateConfig {
-    private Environment environment;
+    private final Environment environment;
 
     @Autowired
-    public void setEnvironment(Environment environment) {
+    public HibernateConfig(Environment environment) {
         this.environment = environment;
     }
 
     @Bean
-    public LocalEntityManagerFactoryBean entityManagerFactory() {
-        LocalEntityManagerFactoryBean localEmfBean =
-                new LocalEntityManagerFactoryBean();
-        localEmfBean.setPersistenceUnitName("spribgCrud");
-        localEmfBean.setJpaProperties(createHibernateProperties());
-        return localEmfBean;
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory() {
+        LocalContainerEntityManagerFactoryBean factoryBean
+                = new LocalContainerEntityManagerFactoryBean();
+        factoryBean.setDataSource(getDataSource());
+        factoryBean.setPackagesToScan("web.model");
+
+        JpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
+        factoryBean.setJpaVendorAdapter(vendorAdapter);
+        factoryBean.setJpaProperties(createHibernateProperties());
+
+        return factoryBean;
     }
 
     @Bean
-    public DataSource dataSource() {
-        BasicDataSource dataSource = new BasicDataSource();
+    public DataSource getDataSource() {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource();
         dataSource.setDriverClassName(environment.getRequiredProperty("jdbc.driverClassName"));
         dataSource.setUrl(environment.getRequiredProperty("jdbc.url"));
         dataSource.setUsername(environment.getRequiredProperty("jdbc.username"));
@@ -56,7 +63,17 @@ public class HibernateConfig {
     }
 
     @Bean
-    public PlatformTransactionManager transactionManager(EntityManagerFactory emf) {
-        return new JpaTransactionManager(emf);
+    public PersistenceExceptionTranslationPostProcessor exceptionTranslation(){
+        return new PersistenceExceptionTranslationPostProcessor();
     }
+
+    @Bean
+    public PlatformTransactionManager transactionManager() {
+        JpaTransactionManager transactionManager = new JpaTransactionManager();
+        transactionManager.setEntityManagerFactory(entityManagerFactory().getObject());
+
+        return transactionManager;
+    }
+
+
 }
